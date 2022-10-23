@@ -18,14 +18,14 @@ namespace Player
 
 		private CompositeDisposable _disposables = new();
 
-		private float       _movingTime;
+		private float _movingTime;
+
 		private BonusFilter _speedFilter = BonusFilterFactory.GetNoneFilter();
-		private BonusFilter _sizeFilter  = BonusFilterFactory.GetNoneFilter();
+		private BonusFilter _widthFilter = BonusFilterFactory.GetNoneFilter();
 		private GameObject  _playerView;
 
 		private float _viewWidth;
 
-		private BonusFilter _widthFilter = BonusFilterFactory.GetNoneFilter();
 
 		private IDisposable _previousSizeBonus;
 		private IDisposable _previousSpeedBonus;
@@ -93,6 +93,9 @@ namespace Player
 		{
 			_disposables?.Dispose();
 
+			_previousSizeBonus?.Dispose();
+			_previousSpeedBonus?.Dispose();
+
 			if (IsOwner)
 			{
 				Events.Events.OnCountDownEnd -= OnCountDownEnd;
@@ -143,8 +146,8 @@ namespace Player
 					_previousSizeBonus?.Dispose();
 					_previousSizeBonus = bonus.StartTimer(() =>
 					{
-						BonusFilterFactory.Release(_sizeFilter);
-						_sizeFilter                      = BonusFilterFactory.GetNoneFilter();
+						BonusFilterFactory.Release(_widthFilter);
+						_widthFilter                     = BonusFilterFactory.GetNoneFilter();
 						scale                            = _playerView.transform.localScale;
 						scale.x                          = _widthFilter.Value(_viewWidth);
 						_playerView.transform.localScale = scale;
