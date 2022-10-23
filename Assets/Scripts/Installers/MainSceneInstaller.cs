@@ -1,4 +1,5 @@
 ﻿using System;
+using Bonuses;
 using Physics;
 using Player;
 using TMPro;
@@ -16,6 +17,7 @@ namespace Installers
 
 		[Inject] private GameSettings      _gameSettings;
 		[Inject] private PhysicsController _physicsController;
+		[Inject] private BonusController   _bonusController;
 		[Inject] private GameResult        _gameResult;
 
 		private int _playersInLobby;
@@ -32,6 +34,7 @@ namespace Installers
 			Events.Events.GameEndClient    += OnGameEndClient;
 
 			_physicsController.AddTo(_disposables);
+			_bonusController.AddTo(_disposables);
 
 			countdownText.text = "";
 			countdownText.gameObject.SetActive(false);
@@ -97,6 +100,7 @@ namespace Installers
 			Events.Events.UpdateScore      -= OnUpdateScore;
 
 			Container.Unbind<PhysicsController>();
+			Container.Unbind<BonusController>();
 		}
 	}
 }

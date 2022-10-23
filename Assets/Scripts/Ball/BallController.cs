@@ -1,9 +1,13 @@
-﻿using Installers;
+﻿using System;
+using Bonuses;
+using Installers;
 using Physics;
+using Player;
 using UniRx;
 using Unity.Netcode;
 using UnityEngine;
 using Zenject;
+using Random = UnityEngine.Random;
 
 namespace Ball
 {
@@ -12,10 +16,44 @@ namespace Ball
 		[Inject] private PhysicsController _physicsController;
 		[Inject] private GameSettings      _gameSettings;
 
-		[HideInInspector] public float   speed = 2;
-		[HideInInspector] public Vector3 direction;
+		private BonusFilter _speedBonusFilter = BonusFilterFactory.GetNoneFilter();
+		private BonusFilter _sizeBonusFilter  = BonusFilterFactory.GetNoneFilter();
+
+		private IDisposable _previousSizeBonus;
+		private IDisposable _previousSpeedBonus;
+
+		public float Speed
+		{
+			get => _speedBonusFilter.Value(_speed);
+			private set => _speed = value;
+		}
+
+		public float Size
+		{
+			get => _sizeBonusFilter.Value(_size);
+			private set => _size = value;
+		}
+
+		public Vector3 Direction { get; private set; }
+
+		public PlayerType CurrentPlayer
+		{
+			get => currentPlayer;
+			private set
+			{
+				currentPlayer = value;
+
+				Events.Events.CurrentPlayerInvoke(CurrentPlayer);
+			}
+		}
+
 
 		private CompositeDisposable _disposables = new();
+
+		private float      _speed;
+		private float      _size;
+		private PlayerType currentPlayer;
+
 
 		public override void OnNetworkSpawn()
 		{
@@ -23,11 +61,47 @@ namespace Ball
 			{
 				Pause();
 
-				Events.Events.RestartBall += OnRestartBall;
+				Events.Events.RestartBall   += OnRestartBall;
 				Events.Events.GameEndServer += OnGameEndServer;
+				Events.Events.ApplyBonus    += OnApplyBonus;
 				ObservableHelper.EveryFixedUpdate.Subscribe(OnTick).AddTo(_disposables);
 
 				_physicsController.RegisterBall(this);
+			}
+		}
+
+		private void OnApplyBonus(BonusModel bonus)
+		{
+			if (bonus.relationship == BonusRelationship.Ball)
+			{
+				switch (bonus.type)
+				{
+					case BonusTypes.Size:
+						BonusFilterFactory.Release(_sizeBonusFilter);
+						_sizeBonusFilter = BonusFilterFactory.GetFilter(bonus);
+						_previousSizeBonus?.Dispose();
+						_previousSizeBonus = bonus.StartTimer(() =>
+						{
+							BonusFilterFactory.Release(_sizeBonusFilter);
+							_sizeBonusFilter = BonusFilterFactory.GetNoneFilter();
+							_previousSizeBonus?.Dispose();
+							_previousSizeBonus = null;
+						});
+						break;
+					case BonusTypes.Speed:
+						BonusFilterFactory.Release(_speedBonusFilter);
+						_speedBonusFilter = BonusFilterFactory.GetFilter(bonus);
+						_previousSpeedBonus = bonus.StartTimer(() =>
+						{
+							BonusFilterFactory.Release(_speedBonusFilter);
+							_speedBonusFilter = BonusFilterFactory.GetNoneFilter();
+							_previousSpeedBonus?.Dispose();
+							_previousSpeedBonus = null;
+						});
+						break;
+					default:
+						throw new ArgumentOutOfRangeException();
+				}
 			}
 		}
 
@@ -38,14 +112,16 @@ namespace Ball
 
 		private void OnTick(Unit u)
 		{
-			speed += _gameSettings.IncreaseBallSpeedByTick;
+			_speed += _gameSettings.IncreaseBallSpeedByTick;
 		}
 
 		public override void OnDestroy()
 		{
 			if (IsServer)
 			{
-				Events.Events.RestartBall -= OnRestartBall;
+				Events.Events.RestartBall   -= OnRestartBall;
+				Events.Events.GameEndServer -= OnGameEndServer;
+				Events.Events.ApplyBonus    -= OnApplyBonus;
 			}
 		}
 
@@ -56,19 +132,39 @@ namespace Ball
 
 		public void Pause()
 		{
-			speed = 0;
+			Speed = 0;
 		}
 
 		public void Restart()
 		{
-			speed              = _gameSettings.StartBallSpeed;
+			Speed              = _gameSettings.StartBallSpeed;
+			Size               = _gameSettings.StartBallRadius;
 			transform.position = Vector3.zero;
+
 
 			do
 			{
-				direction = Random.insideUnitCircle;
-			} while (Mathf.Abs(direction.x) <= 0.3f ||
-			         Mathf.Abs(direction.y) <= 0.3f);
+				Direction = Random.insideUnitCircle;
+			} while (Mathf.Abs(Direction.x) <= 0.3f ||
+			         Mathf.Abs(Direction.y) <= 0.3f);
+
+			CurrentPlayer = Direction.y < 0 ? PlayerType.Top : PlayerType.Bottom;
+		}
+
+		public void FlipX()
+		{
+			var direction = Direction;
+			direction.x *= -1;
+			Direction   =  direction;
+		}
+
+		public void FlipY()
+		{
+			var direction = Direction;
+			direction.y *= -1;
+			Direction   =  direction;
+
+			CurrentPlayer = CurrentPlayer.OppositeSide();
 		}
 	}
 }

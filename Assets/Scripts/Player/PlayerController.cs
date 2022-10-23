@@ -1,4 +1,6 @@
-﻿using CameraTools;
+﻿using System;
+using Bonuses;
+using CameraTools;
 using Installers;
 using UniRx;
 using Unity.Netcode;
@@ -9,13 +11,24 @@ namespace Player
 {
 	public class PlayerController : NetworkBehaviour
 	{
-		[Inject] private GameSettings _gameSettings;
-		[Inject] private Camera       _sceneCamera;
-		[Inject] private GameResult   _gameResult;
+		[Inject] private GameSettings    _gameSettings;
+		[Inject] private Camera          _sceneCamera;
+		[Inject] private GameResult      _gameResult;
+		[Inject] private BonusesSettings _bonusesSettings;
 
 		private CompositeDisposable _disposables = new();
 
-		private float _movingTime;
+		private float       _movingTime;
+		private BonusFilter _speedFilter = BonusFilterFactory.GetNoneFilter();
+		private BonusFilter _sizeFilter  = BonusFilterFactory.GetNoneFilter();
+		private GameObject  _playerView;
+
+		private float _viewWidth;
+
+		private BonusFilter _widthFilter = BonusFilterFactory.GetNoneFilter();
+
+		private IDisposable _previousSizeBonus;
+		private IDisposable _previousSpeedBonus;
 
 		public PlayerModel serverPlayerModel { get; private set; }
 
@@ -43,7 +56,8 @@ namespace Player
 		[Inject]
 		private void Construct()
 		{
-			Instantiate(_gameSettings.PlayerViewPrefab, transform);
+			_playerView = Instantiate(_gameSettings.PlayerViewPrefab, transform);
+			_viewWidth  = _playerView.transform.localScale.x;
 		}
 
 		private void OnCountDownEnd()
@@ -58,7 +72,7 @@ namespace Player
 
 			var fixedDeltaSpeed = _gameSettings.PlayerSpeedCurve.Evaluate(_movingTime) *
 			                      Time.fixedDeltaTime *
-			                      _gameSettings.PlayerSpeed;
+			                      _speedFilter.Value(_gameSettings.PlayerSpeed);
 
 			var startPosition = transform.position;
 			worldMousePosition.y = startPosition.y;
@@ -71,10 +85,11 @@ namespace Player
 			{
 				_movingTime = 0;
 			}
+
 			transform.position = worldMousePosition;
 		}
 
-		public override void OnDestroy()
+		public override void OnNetworkDespawn()
 		{
 			_disposables?.Dispose();
 
@@ -98,6 +113,52 @@ namespace Player
 		public void SetModel(PlayerModel playerModel)
 		{
 			serverPlayerModel = playerModel;
+		}
+
+		[ClientRpc]
+		public void ApplyBonusClientRpc(uint bonusId)
+		{
+			var bonus = _bonusesSettings.GetBonus(bonusId);
+
+			switch (bonus.type)
+			{
+				case BonusTypes.Speed:
+					BonusFilterFactory.Release(_speedFilter);
+					_speedFilter = BonusFilterFactory.GetFilter(bonus);
+					_previousSpeedBonus?.Dispose();
+					_previousSpeedBonus = bonus.StartTimer(() =>
+					{
+						BonusFilterFactory.Release(_speedFilter);
+						_speedFilter = BonusFilterFactory.GetNoneFilter();
+						_previousSpeedBonus?.Dispose();
+						_previousSpeedBonus = null;
+					});
+					break;
+				case BonusTypes.Size:
+					BonusFilterFactory.Release(_widthFilter);
+					_widthFilter = BonusFilterFactory.GetFilter(bonus);
+					var scale = _playerView.transform.localScale;
+					scale.x                          = _widthFilter.Value(_viewWidth);
+					_playerView.transform.localScale = scale;
+					_previousSizeBonus?.Dispose();
+					_previousSizeBonus = bonus.StartTimer(() =>
+					{
+						BonusFilterFactory.Release(_sizeFilter);
+						_sizeFilter                      = BonusFilterFactory.GetNoneFilter();
+						scale                            = _playerView.transform.localScale;
+						scale.x                          = _widthFilter.Value(_viewWidth);
+						_playerView.transform.localScale = scale;
+						_previousSizeBonus?.Dispose();
+						_previousSizeBonus = null;
+					});
+					break;
+			}
+		}
+
+		public void ApplyBonus(BonusModel bonus)
+		{
+			serverPlayerModel.ApplyBonus(bonus);
+			ApplyBonusClientRpc(bonus.id);
 		}
 	}
 }

@@ -18,8 +18,35 @@ MonoBehaviour:
     playerPrefab: {fileID: 1500479321, guid: c21a99c934463c44fba7164aef3981b4, type: 3}
     playerViewPrefab: {fileID: 8129771956262801294, guid: 23cceb658c962da458881223f46bddac, type: 3}
     ballPrefab: {fileID: 5940627678663316920, guid: ab9963a47396c48438964ffa457fd7b1, type: 3}
-    startBallSpeed: 5
+    startBallSpeed: 1
     startBallRadius: 0.1
     startPlayerHeight: 0.1
     startPlayerWidth: 1
     increaseBallSpeedByTick: 0.001
+    cameraSize: 5
+    playerSpeed: 25
+    playerSpeedCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 34
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    bonusTimer: 20

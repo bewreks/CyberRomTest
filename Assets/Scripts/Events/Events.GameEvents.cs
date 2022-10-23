@@ -1,4 +1,5 @@
 ﻿using System;
+using Bonuses;
 using Player;
 
 namespace Events
@@ -7,7 +8,7 @@ namespace Events
 	{
 		public static event Action                               OnCountDownStart;
 		public static event Action                               OnCountDownEnd;
-		public static event Action                               StartPhysics;
+		public static event Action                               StartControllers;
 		public static event Action                               RestartBall;
 		public static event Action<object>                       Inject;
 		public static event Action<PlayerType>                   LooseRound;
@@ -15,6 +16,9 @@ namespace Events
 		public static event Action                               GameEndServer;
 		public static event Action<PlayerType, PlayerController> RegisterPlayer;
 		public static event Action<byte, byte>                   UpdateScore;
+		public static event Action                               BallIntersectsCenter;
+		public static event Action<BonusModel>                   ApplyBonus;
+		public static event Action<PlayerType>                   CurrentPlayer;
 
 		public static void OnCountDownStartInvoke()
 		{
@@ -36,9 +40,9 @@ namespace Events
 			LooseRound?.Invoke(player);
 		}
 
-		public static void StartPhysicsInvoke()
+		public static void StartControllersInvoke()
 		{
-			StartPhysics?.Invoke();
+			StartControllers?.Invoke();
 		}
 
 		public static void UpdateScoreInvoke(byte bottomScore, byte topScore)
@@ -66,18 +70,36 @@ namespace Events
 			GameEndServer?.Invoke();
 		}
 
+		public static void BallIntersectsCenterInvoke()
+		{
+			BallIntersectsCenter?.Invoke();
+		}
+
+		public static void ApplyBonusInvoke(BonusModel bonus)
+		{
+			ApplyBonus?.Invoke(bonus);
+		}
+
+		public static void CurrentPlayerInvoke(PlayerType currentPlayer)
+		{
+			CurrentPlayer?.Invoke(currentPlayer);
+		}
+
 		public static void ClearEvents()
 		{
-			OnCountDownStart = null;
-			OnCountDownEnd   = null;
-			StartPhysics     = null;
-			RestartBall      = null;
-			Inject           = null;
-			LooseRound       = null;
-			GameEndClient    = null;
-			GameEndServer    = null;
-			RegisterPlayer   = null;
-			UpdateScore      = null;
+			OnCountDownStart     = null;
+			OnCountDownEnd       = null;
+			StartControllers     = null;
+			RestartBall          = null;
+			Inject               = null;
+			LooseRound           = null;
+			GameEndClient        = null;
+			GameEndServer        = null;
+			RegisterPlayer       = null;
+			UpdateScore          = null;
+			BallIntersectsCenter = null;
+			ApplyBonus           = null;
+			CurrentPlayer        = null;
 		}
 	}
 }

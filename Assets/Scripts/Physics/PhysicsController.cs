@@ -26,7 +26,7 @@ namespace Physics
 
 		public PhysicsController()
 		{
-			Events.Events.StartPhysics   += OnStartPhysics;
+			Events.Events.StartControllers   += OnStartControllers;
 			Events.Events.RegisterPlayer += OnRegisterPlayer;
 			Events.Events.GameEndServer += OnGameEndServer;
 		}
@@ -41,9 +41,9 @@ namespace Physics
 			_players.Add(type, controller);
 		}
 
-		private void OnStartPhysics()
+		private void OnStartControllers()
 		{
-			// Start();
+			Start();
 		}
 
 		public void Start()
@@ -58,7 +58,7 @@ namespace Physics
 			if (_ball != null)
 			{
 				var oldPosition = _ball.transform.position;
-				var newPosition = oldPosition + _ball.direction * (Time.fixedDeltaTime * _ball.speed);
+				var newPosition = oldPosition + _ball.Direction * (Time.fixedDeltaTime * _ball.Speed);
 
 				var notReady = true;
 
@@ -66,20 +66,25 @@ namespace Physics
 				{
 					notReady = false;
 
-					var rightWall = _gameScreenCollider.xMin + _gameSettings.StartBallRadius;
+					var rightWall = _gameScreenCollider.xMin + _ball.Size;
+
+					if (Math.Abs(Mathf.Sign(newPosition.y) - Mathf.Sign(oldPosition.y)) > Mathf.Epsilon)
+					{
+						Events.Events.BallIntersectsCenterInvoke();
+					}
 
 					if (newPosition.x <= rightWall)
 					{
-						_ball.direction.x *= -1;
+						_ball.FlipX();
 						newPosition.x     =  rightWall - (newPosition.x - rightWall);
 						notReady          =  true;
 					}
 
-					var leftWall = _gameScreenCollider.xMax - _gameSettings.StartBallRadius;
+					var leftWall = _gameScreenCollider.xMax - _ball.Size;
 
 					if (newPosition.x >= leftWall)
 					{
-						_ball.direction.x *= -1;
+						_ball.FlipX();
 						newPosition.x     =  leftWall - (newPosition.x - leftWall);
 						notReady          =  true;
 					}
@@ -96,7 +101,7 @@ namespace Physics
 							return;
 						}
 
-						_ball.direction.y *= -1;
+						_ball.FlipY();
 						newPosition.y     =  bottomWall - (newPosition.y - bottomWall);
 						notReady          =  true;
 					}
@@ -113,7 +118,7 @@ namespace Physics
 							return;
 						}
 
-						_ball.direction.y *= -1;
+						_ball.FlipY();
 						newPosition.y     =  topWall - (newPosition.y - topWall);
 						notReady          =  true;
 					}
@@ -129,7 +134,12 @@ namespace Physics
 		{
 			if (_players.TryGetValue(type, out var controller))
 			{
+				
 				var playerPosition = controller.transform.position;
+				Debug.DrawLine(start, end, Color.magenta, 1);
+				Debug.DrawLine(controller.serverPlayerModel.Left + playerPosition, 
+				               controller.serverPlayerModel.Right + playerPosition, 
+				               Color.green, 1);
 				return MathHelper.IsLinesIntersects(start, 
 				                                    end, 
 				                                    controller.serverPlayerModel.Left + playerPosition,
@@ -147,7 +157,7 @@ namespace Physics
 
 		public void Dispose()
 		{
-			Events.Events.StartPhysics   -= OnStartPhysics;
+			Events.Events.StartControllers   -= OnStartControllers;
 			Events.Events.RegisterPlayer -= OnRegisterPlayer;
 			Events.Events.GameEndServer  -= OnGameEndServer;
 			_players.Clear();

@@ -2,9 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using Ball;
-using CameraTools;
+using Bonuses;
 using Installers;
-using Physics;
 using Player;
 using UniRx;
 using Unity.Netcode;
@@ -14,16 +13,18 @@ using Zenject;
 
 namespace Network
 {
-	public class NetworkGameController : NetworkBehaviour, IDisposable
+	public class NetworkGameController : NetworkBehaviour,
+	                                     IDisposable
 	{
-		[Inject] private GameSettings      _gameSettings;
-		[Inject] private NetworkSettings   _networkSettings;
-		[Inject] private DiContainer       _container;
-		[Inject] private Camera            _camera;
+		[Inject] private GameSettings    _gameSettings;
+		[Inject] private NetworkSettings _networkSettings;
+		[Inject] private DiContainer     _container;
 
-		private Dictionary<ulong, PlayerModel>      _playersByID   = new();
-		private Dictionary<PlayerType, PlayerModel> _playersByType = new();
-		private GameState                           _state;
+		private Dictionary<ulong, PlayerModel>           _playersByID       = new();
+		private Dictionary<PlayerType, PlayerModel>      _playersByType     = new();
+		private Dictionary<PlayerType, PlayerController> _playerControllers = new();
+		private GameState                                _state;
+		private PlayerType                               _currentPlayer;
 
 		private BallController _ball;
 
@@ -42,6 +43,8 @@ namespace Network
 				NetworkManager.OnClientDisconnectCallback  += OnDisconnect;
 				NetworkManager.SceneManager.OnLoadComplete += OnSceneLoadComplete;
 				Events.Events.LooseRound                   += OnPlayerLoose;
+				Events.Events.CurrentPlayer                += OnCurrentPlayerChange;
+				Events.Events.ApplyBonus                   += OnApplyBonus;
 			}
 
 			if (IsHost)
@@ -50,12 +53,38 @@ namespace Network
 			}
 		}
 
+		private void OnApplyBonus(BonusModel bonus)
+		{
+			if (bonus.relationship != BonusRelationship.Player &&
+			    bonus.relationship != BonusRelationship.Enemy)
+			{
+				return;
+			}
+
+			var relationShip = _currentPlayer;
+
+			if (bonus.relationship == BonusRelationship.Enemy)
+			{
+				relationShip = relationShip.OppositeSide();
+			}
+
+			if (_playerControllers.TryGetValue(relationShip, out var controller))
+			{
+				controller.ApplyBonus(bonus);
+			}
+		}
+
+		private void OnCurrentPlayerChange(PlayerType current)
+		{
+			_currentPlayer = current;
+		}
+
 		private void OnPlayerLoose(PlayerType type)
 		{
 			if (_playersByType.ContainsKey(type))
 			{
 				_playersByType[type].DecreaseScore();
-				
+
 				var bottomScore = _gameSettings.MaxScore;
 				var topScore    = _gameSettings.MaxScore;
 
@@ -63,12 +92,14 @@ namespace Network
 				{
 					bottomScore = model.Score;
 				}
+
 				if (_playersByType.TryGetValue(PlayerType.Top, out model))
 				{
 					topScore = model.Score;
 				}
+
 				UpdateScoreClientRpc(bottomScore, topScore);
-				
+
 				if (_playersByType[type].Score <= 0)
 				{
 					Events.Events.GameEndServerInvoke();
@@ -80,7 +111,6 @@ namespace Network
 				{
 					Events.Events.BallRestartInvoke();
 				}
-				
 			}
 		}
 
@@ -108,6 +138,7 @@ namespace Network
 			var playerController = networkObject.GetComponent<PlayerController>();
 			playerController.SetModel(playerModel);
 			playerController.SetSideClientRpc(playerModel.Type);
+			_playerControllers.Add(playerModel.Type, playerController);
 			Events.Events.RegisterPlayerInvoke(playerModel.Type,
 			                                   playerController);
 			CheckForAllLoaded();
@@ -118,7 +149,7 @@ namespace Network
 			if (_playersByID.All(pair => pair.Value.IsOnMainScene))
 			{
 				NetworkManager.SceneManager.OnLoadComplete -= OnSceneLoadComplete;
-				Events.Events.StartPhysicsInvoke();
+				Events.Events.StartControllersInvoke();
 				_ball = Instantiate(_gameSettings.BallPrefab);
 				_container.Inject(_ball);
 				_ball.GetComponent<NetworkObject>().Spawn();
@@ -153,7 +184,7 @@ namespace Network
 
 			if (!_playersByID.ContainsKey(clientId))
 			{
-				var playerModel = new PlayerModel(clientId, 
+				var playerModel = new PlayerModel(clientId,
 				                                  (PlayerType)(_playersByID.Count % 2),
 				                                  _gameSettings.MaxScore);
 				_playersByID.Add(clientId, playerModel);
@@ -177,7 +208,9 @@ namespace Network
 				NetworkManager.OnClientDisconnectCallback -= OnDisconnect;
 				if (NetworkManager.SceneManager != null)
 					NetworkManager.SceneManager.OnLoadComplete -= OnSceneLoadComplete;
-				Events.Events.LooseRound -= OnPlayerLoose;
+				Events.Events.LooseRound    -= OnPlayerLoose;
+				Events.Events.CurrentPlayer -= OnCurrentPlayerChange;
+				Events.Events.ApplyBonus    -= OnApplyBonus;
 			}
 		}
 

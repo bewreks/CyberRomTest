@@ -1,18 +1,30 @@
 ﻿using System;
+using Bonuses;
 using UnityEngine;
 
 namespace Player
 {
+	[Serializable]
 	public class PlayerModel
 	{
-		public ulong      Id            { get; private set; }
-		public bool       IsOnMainScene { get; private set; }
-		public byte       Score         { get; private set; }
-		public PlayerType Type          { get; private set; }
-		public float      Width         { get; private set; }
-		public float      Height        { get; private set; }
-		public Vector3    Left          { get; private set; }
-		public Vector3    Right         { get; private set; }
+		private float      _width;
+		public  ulong      Id            { get; private set; }
+		public  bool       IsOnMainScene { get; private set; }
+		public  byte       Score         { get; private set; }
+		public  PlayerType Type          { get; private set; }
+
+		public float Width
+		{
+			get => _sizeFilter.Value(_width);
+			private set => _width = value;
+		}
+
+		public  float      Height        { get; private set; }
+		public  Vector3    Left          { get; private set; }
+		public  Vector3    Right         { get; private set; }
+
+		private BonusFilter _sizeFilter = BonusFilterFactory.GetNoneFilter();
+		private IDisposable _previousSizeBonus;
 
 		public PlayerModel(ulong id, PlayerType type, byte startScore)
 		{
@@ -51,6 +63,24 @@ namespace Player
 			Left  = new Vector3(-halfWidth, -height);
 			Right = new Vector3(halfWidth,  -height);
 		}
+
+		public void ApplyBonus(BonusModel bonus)
+		{
+			if (bonus.type == BonusTypes.Size)
+			{
+				BonusFilterFactory.Release(_sizeFilter);
+				_sizeFilter = BonusFilterFactory.GetFilter(bonus);
+				CalcPoints();
+				_previousSizeBonus = bonus.StartTimer(() =>
+				{
+					BonusFilterFactory.Release(_sizeFilter);
+					_sizeFilter = BonusFilterFactory.GetNoneFilter();
+					_previousSizeBonus?.Dispose();
+					_previousSizeBonus = null;
+					CalcPoints();
+				});
+			}
+		}
 	}
 
 	public enum PlayerType
@@ -58,28 +88,5 @@ namespace Player
 		NotSet = -1,
 		Bottom = 0,
 		Top    = 1,
-	}
-
-	public static class PlayerHelper
-	{
-		public static PlayerType OppositeSide(this PlayerType type)
-		{
-			return type switch
-			       {
-				       PlayerType.Bottom => PlayerType.Top,
-				       PlayerType.Top    => PlayerType.Bottom,
-				       _                 => throw new ArgumentOutOfRangeException(nameof(type), type, null)
-			       };
-		}
-
-		public static int GetSide(this PlayerType type)
-		{
-			return type switch
-			       {
-				       PlayerType.Bottom => -1,
-				       PlayerType.Top    => 1,
-				       _                 => throw new ArgumentOutOfRangeException(nameof(type), type, null)
-			       };
-		}
 	}
 }

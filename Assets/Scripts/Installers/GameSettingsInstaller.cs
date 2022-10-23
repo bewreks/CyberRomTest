@@ -1,7 +1,6 @@
 using System;
 using Ball;
 using Unity.Netcode;
-using UnityEditor.UIElements;
 using UnityEngine;
 using Zenject;
 
@@ -34,6 +33,7 @@ namespace Installers
 		[SerializeField] private float          cameraSize              = 5;
 		[SerializeField] private float          playerSpeed             = 5;
 		[SerializeField] private AnimationCurve playerSpeedCurve;
+		[SerializeField] private float          bonusTimer = 20;
 
 		public int            CountDownSeconds        => countDownSeconds;
 		public byte           MaxScore                => maxScore;
@@ -48,5 +48,6 @@ namespace Installers
 		public float          CameraSize              => cameraSize;
 		public float          PlayerSpeed             => playerSpeed;
 		public AnimationCurve PlayerSpeedCurve        => playerSpeedCurve;
+		public float          BonusTimer              => bonusTimer;
 	}
 }

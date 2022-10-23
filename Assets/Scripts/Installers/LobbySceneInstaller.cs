@@ -1,4 +1,5 @@
-﻿using Physics;
+﻿using Bonuses;
+using Physics;
 using Player;
 using UnityEngine;
 using Zenject;
@@ -22,7 +23,9 @@ namespace Installers
 			Container.Bind<GameResult>().FromNew().AsCached();
 			Container.Bind<Camera>().FromInstance(gameCamera).AsCached();
 			Container.Bind<PhysicsController>().FromNew().AsCached();
+			Container.Bind<BonusController>().FromNew().AsCached();
 			Container.Inject(Container.Resolve<PhysicsController>());
+			Container.Inject(Container.Resolve<BonusController>());
 		}
 	}
 }
